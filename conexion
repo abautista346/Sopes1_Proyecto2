@@ -1,0 +1,1 @@
+ssh -i "/home/plata346/Escritorio/Sopes1/Proyecto 2/ClaveAWS.pem" ubuntu@ec2-18-221-236-41.us-east-2.compute.amazonaws.com
