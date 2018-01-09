@@ -31,6 +31,7 @@ void *funcionThread2 (void *parametro);
 void *escribir(void *parametro);
 void *leer(void *parametro);
 void *reloj(void *parametro);
+void *relojRead(void *parametro);
 
 int x=0,y=0;
 int max_x=0,max_y=0;
@@ -42,6 +43,7 @@ pthread_t idHilo;
 pthread_t rhilo;
 pthread_t whilo;
 pthread_t chilo;
+pthread_t crhilo;
 bool p1_entra,p2_entra;
 int turno,vida=0,ptos=0;
 int jugador=0,aliens=0,rival=0,vidarival=5,ptorival=0;
@@ -50,6 +52,9 @@ int minutos=0;
 int segundos=0;
 int vidarival2=5;
 bool ledi=false;
+
+bool quien=true;
+int valorDelSemaforo=0;
 
 struct sembuf procc;
 struct sembuf procc2;
@@ -128,6 +133,7 @@ INICIO:
     mcompartida[25]=1;
     mcompartida[26]=1;
     mcompartida[27]=1;
+    mcompartida[28]=0;
 
     //estado de las naves
     objetivos[1] = 1;
@@ -159,16 +165,36 @@ INICIO:
     {
 	//asignacion de variabels para jugadores segun sea el caso
         case 'a':
+            //primero buscamos semaforo si existe o no existe
+            procc2.sem_num = 0;
+            procc2.sem_op = 1;
+            procc2.sem_flg = 0;
 
-    	    printw("          ------> LISTO!!! Esperando al despreciable invasor <------           \n");
-  	    getch();
-	    semctl (identificadorSEM, 0, SETVAL, 0);
+            int i;
+            for (i = 0; i<1; i++)
+            {
+                printf("AL ATAQUE!!! \n");
+                semop (identificadorSEM, &procc2, 1);
+                sleep (1);
+            }
+            quien = false;
 
-            procc.sem_num = 0;
-            procc.sem_op = -1;
-            procc.sem_flg = 0;
+            valorDelSemaforo = semctl(identificadorSEM, 0, GETVAL);//obtenemos el valor del semaforo
+            //si existe semaforo en espera el resultado sera 0
 
-	    semop (identificadorSEM, &procc, 1);
+            if(valorDelSemaforo != 0)
+            {
+                printw("          ------> LISTO!!! Esperando al despreciable invasor <------           \n");
+                getch();
+                semctl (identificadorSEM, 0, SETVAL, 0);
+
+
+                procc.sem_num = 0;
+                procc.sem_op = -1;
+                procc.sem_flg = 0;
+                semop (identificadorSEM, &procc, 1);
+
+            }
 
             jugador=1;
             mcompartida[0]=1;
@@ -181,18 +207,48 @@ INICIO:
             break;
 
         default:
-      
-            procc2.sem_num = 0;
-            procc2.sem_op = 1;
-            procc2.sem_flg = 0;
 
-            int i;
-            for (i = 0; i<1; i++)
-            {
-                printf("AL ATAQUE!!! \n");
-                semop (identificadorSEM, &procc2, 1);
-                sleep (1);
-            }
+	    	procc2.sem_num = 0;
+	    	procc2.sem_op = 1;
+	    	procc2.sem_flg = 0;
+
+	    	//int i;
+	    	for (i = 0; i<1; i++)
+	    	{
+			printf("AL ATAQUE!!! \n");
+			semop (identificadorSEM, &procc2, 1);
+			sleep (1);
+	    	}
+
+		    valorDelSemaforo = semctl(identificadorSEM, 0, GETVAL);//obtenemos el valor del semaforo
+		
+		    if(valorDelSemaforo != 0)
+		    {
+			    printw("          ------> LISTO!!! Esperando al gran defensor <------           \n");
+		  	    getch();
+			    semctl (identificadorSEM, 0, SETVAL, 0);
+
+		        procc.sem_num = 0;
+		        procc.sem_op = -1;
+                procc.sem_flg = 0;
+		    	semop (identificadorSEM, &procc, 1);
+
+		    }
+
+/*
+            char cadenaa[128] = "SEMAFORO -> ";
+
+            sprintf(text, "%d", valorDelSemaforo);
+
+            strcat(cadenaa, text);
+
+            printf("DESPUES DE BUSCAR \n");
+            printf("%s",cadenaa);
+            printf("\n");
+            getch();
+            getch();
+            getch();
+*/		
 
             jugador=2;
             mcompartida[4]=1;
@@ -201,7 +257,7 @@ INICIO:
             mcompartida[7]=ptos;
             error_hilo= pthread_create (&rhilo, NULL, leer, NULL);
             error_hilo= pthread_create (&whilo, NULL, escribir, NULL);
-            error_hilo= pthread_create (&chilo, NULL, reloj, NULL);
+            error_hilo= pthread_create (&crhilo, NULL, relojRead, NULL);
             break;
     }
 
@@ -240,7 +296,7 @@ void control()
     if((vidarival==1) || (vida==1) || (ptos>=100))
     {
             printw("Finish Him!!!\n");
-	    char *puntos="Puntos: ";
+	        char *puntos="Puntos: ";
             char ptos1[15];
             char ptos2[15];
             char *tiempo="Tiempo: ";
@@ -379,8 +435,7 @@ void control()
 ///*
 
 
-
-        if(iterador < 5 )
+    if(iterador < 5 )
 	{
 		if(iterador==r1+1)
 		{
@@ -1305,19 +1360,80 @@ void *leer(void *parametro)
 
 void *reloj(void *parametro)
 {
-    while(1)
+    while( true )
+    {
+    p1_entra = true;
+    while( p2_entra )
+    {
+        if( turno == 2 )
+        {
+        p1_entra = false;
+        while( turno == 2 ){}
+        p1_entra = true;
+        }
+    }
+    int iterador;
+    if(jugador==1)
     {
 #ifdef MUTEX
 		/* Esperamos y bloqueamos el mutex (EM) */
 		pthread_mutex_lock (&mutexBuffer);
 #endif
         minutos=minutos+1;
+        mcompartida[28] = minutos;
 
 #ifdef MUTEX
 		/* Desbloquemos el mutex (EM) */
 		pthread_mutex_unlock (&mutexBuffer);
 #endif
         sleep(1);
+
+    }
+    else
+    {
+
+    }
+    turno = 2;
+    p1_entra = false;
+    }
+}
+
+void *relojRead(void *parametro)
+{
+
+while( true )
+    {
+    p2_entra = true;
+    while( p1_entra )
+    {
+        if( turno == 1 )
+        {
+        p2_entra = false;
+        while( turno == 1 ){}
+        p2_entra = true;
+        }
+    }
+    int iterador=0;
+    if(jugador==1)
+    {
+
+    }
+    else
+    {
+#ifdef MUTEX
+		/* Esperamos y bloqueamos el mutex (EM) */
+		pthread_mutex_lock (&mutexBuffer);
+#endif
+        minutos=mcompartida[28];
+
+#ifdef MUTEX
+		/* Desbloquemos el mutex (EM) */
+		pthread_mutex_unlock (&mutexBuffer);
+#endif
+        sleep(1);        
+    }
+    turno = 1;
+    p2_entra = false;
     }
 }
 
@@ -1374,6 +1490,7 @@ void Reinicio()
     mcompartida[25]=1;
     mcompartida[26]=1;
     mcompartida[27]=1;
+    mcompartida[28]=0;
 
     //estado de las naves
     objetivos[1] = 1;
@@ -1406,15 +1523,35 @@ void Reinicio()
 	//asignacion de variabels para jugadores segun sea el caso
         case 'a':
 
-    	    printw("          ------> LISTO!!! Esperando al despreciable invasor <------           \n");
-  	    getch();
-	    semctl (identificadorSEM, 0, SETVAL, 0);
+            //primero buscamos semaforo si existe o no existe
+		    procc2.sem_num = 0;
+	    	procc2.sem_op = 1;
+	    	procc2.sem_flg = 0;
 
-            procc.sem_num = 0;
-            procc.sem_op = -1;
-            procc.sem_flg = 0;
+	    	int i;
+	    	for (i = 0; i<1; i++)
+	    	{
+			    printf("AL ATAQUE!!! \n");
+			    semop (identificadorSEM, &procc2, 1);
+			    sleep (1);
+	    	}
+		    quien = false;
 
-	    semop (identificadorSEM, &procc, 1);
+		    valorDelSemaforo = semctl(identificadorSEM, 0, GETVAL);//obtenemos el valor del semaforo
+		    //si existe semaforo en espera el resultado sera 0
+		
+		    if(valorDelSemaforo != 0)
+		    {
+                printw("          ------> LISTO!!! Esperando al despreciable invasor <------           \n");
+                getch();
+                semctl (identificadorSEM, 0, SETVAL, 0);
+
+		        procc.sem_num = 0;
+		        procc.sem_op = -1;
+                procc.sem_flg = 0;
+		    	semop (identificadorSEM, &procc, 1);
+
+		    }
 
             jugador=1;
             mcompartida[0]=1;
@@ -1429,16 +1566,33 @@ void Reinicio()
         default:
       
             procc2.sem_num = 0;
-            procc2.sem_op = 1;
-            procc2.sem_flg = 0;
+    	    procc2.sem_op = 1;
+	    	procc2.sem_flg = 0;
 
-            int i;
-            for (i = 0; i<1; i++)
-            {
+	    	//int i;
+
+	    	for (i = 0; i<1; i++)
+	    	{
                 printf("AL ATAQUE!!! \n");
                 semop (identificadorSEM, &procc2, 1);
                 sleep (1);
-            }
+	    	}
+
+		    valorDelSemaforo = semctl(identificadorSEM, 0, GETVAL);//obtenemos el valor del semaforo
+		
+		    if(valorDelSemaforo != 0)
+		    {
+                printw("          ------> LISTO!!! Esperando al gran defensor <------           \n");
+                getch();
+                semctl (identificadorSEM, 0, SETVAL, 0);
+
+		        procc.sem_num = 0;
+		        procc.sem_op = -1;
+                procc.sem_flg = 0;
+		    	semop (identificadorSEM, &procc, 1);
+
+		    }
+
 
             jugador=2;
             mcompartida[4]=1;
@@ -1447,7 +1601,7 @@ void Reinicio()
             mcompartida[7]=ptos;
             error_hilo= pthread_create (&rhilo, NULL, leer, NULL);
             error_hilo= pthread_create (&whilo, NULL, escribir, NULL);
-            error_hilo= pthread_create (&chilo, NULL, reloj, NULL);
+            error_hilo= pthread_create (&crhilo, NULL, relojRead, NULL);
             break;
     }
 #ifdef MUTEX
